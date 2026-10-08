@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://green-cicd-backend-1.onrender.com"
+  baseURL: "http://127.0.0.1:8000"
 });
 
 // Attach JWT token automatically
@@ -18,6 +18,15 @@ API.interceptors.request.use((config) => {
 export const loginUser = (data) => API.post("/users/login", data);
 
 export const registerUser = (data) => API.post("/users/register", data);
+
+
+/* ---------- GITHUB APP ---------- */
+
+export const connectGitHub = () => API.get("/github/connect");
+
+export const setupGitHub = (params) => API.get("/github/setup", { params });
+
+export const getGitHubStatus = () => API.get("/github/status");
 
 
 /* ---------- PROJECTS ---------- */
@@ -41,9 +50,15 @@ export const getCarbonTrend = (projectId) =>
   API.get(`/carbon-trend/${projectId}`);
 
 
+export const getProjectSummary = (projectId) =>
+  API.get(`/project-summary/${projectId}`);
+
 /* ---------- OPTIMIZATION ---------- */
 
 export const optimizeRegion = (projectId) =>
+  API.post(`/optimize/${projectId}`);
+
+export const getOptimizationRecommendation = (projectId) =>
   API.post(`/optimize/${projectId}`);
 
 

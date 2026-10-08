@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../api";
+import API, { connectGitHub as apiConnectGitHub, getGitHubStatus } from "../api";
 import ProjectList from "../components/ProjectList";
 import CarbonChart from "../components/CarbonChart";
 import RecommendationCard from "../components/RecommendationCard";
@@ -553,6 +553,7 @@ export default function Dashboard() {
   const [error, setError]                 = useState(null);
   const [projectName, setProjectName]     = useState("");
   const [repoUrl, setRepoUrl]             = useState("");
+  const [githubConnected, setGithubConnected] = useState(false);
 
   const navigate = useNavigate();
 
@@ -564,6 +565,13 @@ export default function Dashboard() {
       } catch (err) {
         console.error(err);
         setError("Failed to load projects.");
+      }
+
+      try {
+        const statusRes = await getGitHubStatus();
+        setGithubConnected(statusRes.data.connected);
+      } catch (err) {
+        console.error("Failed to check GitHub status:", err);
       }
     })();
   }, []);
@@ -599,7 +607,11 @@ export default function Dashboard() {
   );
 
   const handleCreateProject = async () => {
-    if (!projectName.trim() || !repoUrl.trim()) return;
+    if (!projectName.trim() || !repoUrl.trim()) {
+      setError("Please provide both a project name and repository URL.");
+      return;
+    }
+    setError(null);
     try {
       const res = await API.post("/projects", { project_name: projectName, repo_url: repoUrl });
       setProjects(prev => [...prev, res.data]);
@@ -607,7 +619,7 @@ export default function Dashboard() {
       setRepoUrl("");
     } catch (err) {
       console.error(err);
-      setError("Failed to create project.");
+      setError(err.response?.data?.detail || "Failed to create project.");
     }
   };
 
@@ -629,6 +641,27 @@ export default function Dashboard() {
     localStorage.removeItem("token");
     navigate("/login");
   };
+
+  const handleConnectGitHub = async () => {
+    setError(null);
+    try {
+      const response = await apiConnectGitHub();
+      const installUrl = response.data?.install_url;
+      const state = response.data?.state;
+      if (state) {
+        sessionStorage.setItem("github_setup_state", state);
+      }
+      if (installUrl) {
+        window.location.href = installUrl;
+      } else {
+        setError("Failed to generate GitHub App installation URL.");
+      }
+    } catch (error) {
+      console.error("GitHub connection failed:", error);
+      setError("GitHub connection failed. Please log in and try again.");
+    }
+  };
+
 
   return (
     <>
@@ -693,6 +726,9 @@ export default function Dashboard() {
                       <div className="ph-icon ph-icon-green">＋</div>
                       <span className="ph-title ph-title-green">New Project</span>
                     </div>
+                    {githubConnected && (
+                      <span className="ph-badge ph-badge-green">✓ GitHub Connected</span>
+                    )}
                   </div>
                   <div className="ph-divider" />
 
@@ -718,6 +754,20 @@ export default function Dashboard() {
                       onKeyDown={e => e.key === "Enter" && handleCreateProject()}
                     />
                   </div>
+                  <button 
+                    onClick={handleConnectGitHub} 
+                    className="create-btn"
+                    style={{ 
+                      marginBottom: "8px", 
+                      background: githubConnected 
+                        ? "rgba(255, 255, 255, 0.06)" 
+                        : "linear-gradient(135deg, #00d68f, #00a86b)",
+                      color: githubConnected ? "var(--text)" : "#002818",
+                      border: githubConnected ? "1px solid var(--border-up)" : "none"
+                    }}
+                  >
+                    {githubConnected ? "⚙ Manage GitHub App" : "🔗 Connect GitHub"}
+                  </button>
                   <button onClick={handleCreateProject} className="create-btn">
                     ＋ Create Project
                   </button>

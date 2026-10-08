@@ -53,7 +53,6 @@ const glowDotPlugin = {
   id: "glowDot",
   afterDraw(chart) {
     if (chart._hoveredDataIndex == null) return;
-    const ds = chart.data.datasets[0];
     const meta = chart.getDatasetMeta(0);
     const point = meta.data[chart._hoveredDataIndex];
     if (!point) return;
@@ -264,25 +263,26 @@ const RANGES = ["7D", "14D", "30D", "ALL"];
 
 export default function CarbonChart({ data = [] }) {
   const chartRef = useRef(null);
-  const safeData = Array.isArray(data) ? data : [];
 
   // Range filter state (visual only — slices from the tail)
   const [range, setRange] = useState("ALL");
 
   const sliced = useMemo(() => {
+    const safeData = Array.isArray(data) ? data : [];
     const map = { "7D": 7, "14D": 14, "30D": 30, ALL: Infinity };
     const n = map[range] ?? Infinity;
     return safeData.slice(-n);
-  }, [safeData, range]);
+  }, [data, range]);
 
   // Derived stats
-  const values = sliced.map(d => Number(d?.total_carbon ?? 0));
+    // Derived stats (convert kg to grams by multiplying by 1000)
+  const values = sliced.map(d => Number(d?.total_carbon ?? 0) * 1000);
   const latest  = values.at(-1) ?? 0;
   const prev    = values.at(-2) ?? latest;
   const delta   = latest - prev;
   const pct     = prev !== 0 ? ((delta / prev) * 100).toFixed(1) : null;
   const total   = values.reduce((a, b) => a + b, 0);
-  const avg     = values.length ? (total / values.length).toFixed(2) : 0;
+  const avg     = values.length ? (total / values.length).toFixed(3) : 0;
 
   // Build gradient inside component so it updates with chart
   const getGradient = (ctx, chartArea) => {
@@ -298,7 +298,7 @@ export default function CarbonChart({ data = [] }) {
     labels: sliced.map(getDayLabel),
     datasets: [{
       label: "CO₂ Emissions",
-      data: sliced.map(d => Number(d?.total_carbon ?? 0)),
+      data: sliced.map(d => Number(d?.total_carbon ?? 0) * 1000),
       borderColor: "#00d68f",
       backgroundColor: (context) => {
         const chart = context.chart;
@@ -352,7 +352,7 @@ export default function CarbonChart({ data = [] }) {
           title: (items) => items[0]?.label ?? "",
           label: (ctx) => {
             const v = ctx.parsed.y;
-            return `${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg CO₂`;
+            return `Carbon: ${v.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} g CO₂`;
           },
           afterLabel: (ctx) => {
             const idx = ctx.dataIndex;
@@ -360,8 +360,8 @@ export default function CarbonChart({ data = [] }) {
             if (prev == null) return "";
             const diff = ctx.parsed.y - prev;
             return diff >= 0
-              ? `▲ +${diff.toFixed(2)} vs prev`
-              : `▼ ${diff.toFixed(2)} vs prev`;
+              ? `▲ +${diff.toFixed(3)} vs prev`
+              : `▼ ${diff.toFixed(3)} vs prev`;
           }
         }
       }
@@ -389,7 +389,7 @@ export default function CarbonChart({ data = [] }) {
           color: "#4a7060",
           font: { family: "'DM Mono', monospace", size: 10 },
           padding: 8,
-          callback: (v) => `${v}kg`
+          callback: (v) => `${Number(v).toFixed(2)}g`
         }
       }
     }
@@ -409,7 +409,7 @@ export default function CarbonChart({ data = [] }) {
             <div className="cc-icon">📈</div>
             <div>
               <div className="cc-title">Carbon Emissions Trend</div>
-              <div className="cc-subtitle">{sliced.length} data points · kg CO₂ equivalent</div>
+              <div className="cc-subtitle">{sliced.length} data points · g CO₂ equivalent</div>
             </div>
           </div>
 
@@ -424,16 +424,17 @@ export default function CarbonChart({ data = [] }) {
             )}
             <div className="cc-stat">
               <div className="cc-stat-val">{avg}</div>
-              <div className="cc-stat-label">avg kg</div>
+              <div className="cc-stat-label">avg g</div>
             </div>
             <div className="cc-stat">
               <div className="cc-stat-val" style={{ color: trendColor }}>
-                {latest.toFixed(2)}
+                {latest.toFixed(3)}
               </div>
-              <div className="cc-stat-label">latest</div>
+              <div className="cc-stat-label">latest g</div>
             </div>
           </div>
         </div>
+
 
         <div className="cc-divider" />
 
